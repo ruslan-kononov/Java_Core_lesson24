@@ -16,10 +16,6 @@ public class Movie implements Serializable,Comparable<Movie> {
         return title;
     }
 
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
     public Time getDuration() {
         return duration;
     }

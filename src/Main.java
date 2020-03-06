@@ -45,6 +45,7 @@ public class Main {
                         break;
                     case 4:
                         cinema.removeSeance();
+                        break;
                     case 5:
                         cinema.printSeancesByDay();
                         break;
@@ -60,6 +61,9 @@ public class Main {
                         break;
                     case 9:
                         cinema = (Cinema) SerializingMethods.deserialize(new File("NewCinema.txt"));
+                        System.out.println();
+                        System.out.println("Cinema \"Space\" welcomes you!");
+                        System.out.println("Our working hours: "+cinema.getOpen()+" - "+cinema.getClose());
                         break;
                     case 10:
                         cinema.displaySchedule();

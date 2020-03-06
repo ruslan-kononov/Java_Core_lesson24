@@ -7,11 +7,15 @@ public class Time implements Serializable,Comparable<Time> {
 
     public Time(int hour,int min) {
         if (min>=60){
-            hour%=24;
             hour+=min/60;
             min=min%60;
+            if(hour>23){
+                hour%=24;
+            }
+        }else if(hour>23){
+            hour%=24;
         }
-        if(hour<0 || hour>23||min<0){
+        if(hour<0 ||min<0){
             throw new IncorrectTimeException("Sorry, you entered invalid time!");
         }
         this.hour = hour;
