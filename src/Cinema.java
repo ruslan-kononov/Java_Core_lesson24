@@ -7,20 +7,16 @@ import java.util.stream.Collectors;
 public class Cinema implements Serializable {
 
     private static final long serialVersionUID = 123L;
-    private TreeMap<Days, Schedule> schedules;
     private ArrayList<Movie> moviesLibrary;
+    private TreeSet<Hall> halls;
     private Time open;
     private Time close;
 
     public Cinema(Time open, Time close) throws FileNotFoundException {
-        this.schedules = new TreeMap<>();
         this.moviesLibrary = new ArrayList<>();
+        this.halls = new TreeSet<Hall>();
         this.open = open;
         this.close = close;
-    }
-
-    public TreeMap<Days, Schedule> getSchedules() {
-        return schedules;
     }
 
     public ArrayList<Movie> getMoviesLibrary() {
@@ -50,6 +46,15 @@ public class Cinema implements Serializable {
         System.out.println("Closing time: " + getClose());
     }
 
+    public void addNewHall() {
+        Scanner input = new Scanner(System.in);
+        System.out.println();
+        System.out.print("Enter hall's name: ");
+        String name = input.nextLine().strip();
+        halls.add(new Hall(name));
+        System.out.println("\'"+name+"\' has been added to the system.");
+    }
+
     public void addMovie() throws InterruptedException, IOException {
         Scanner input = new Scanner(System.in);
         System.out.println();
@@ -70,34 +75,37 @@ public class Cinema implements Serializable {
     public void addSeance() {
         Scanner input = new Scanner(System.in);
         System.out.println();
-        System.out.print("Enter the day you want to choose: ");
-        String day = input.nextLine().strip();
-        List<Days> listDays = Arrays.asList(Days.values());
-        //get Days object if it exists
-        Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
-        if (!chosenDay.isEmpty()) {
-            Seance seance = null;
-            System.out.print("Enter title of a film: ");
-            String movieName = input.nextLine().strip();
-            //add seance
-            for (Movie m : moviesLibrary) {
-                if (m.getTitle().equalsIgnoreCase(movieName)) {
-                    Time seanceTime = enterTime();
-                    seance = new Seance(m, seanceTime);
-                    if(open.compareTo(close)==-1){
-                        //check if seance can fit into the schedule given that cinema works till midnight
-                        addSeanceTillMidnight(seance,seanceTime,chosenDay.get());
-                    }else{
-                        //check if seance can fit into the schedule given that cinema works after midnight too
-                        addSeanceAfterMidnight(seance,seanceTime,chosenDay.get());
+        Hall chosenHall = chooseHall();
+        if (chosenHall!=null) {
+            System.out.print("Enter the day you want to choose: ");
+            String day = input.nextLine().strip();
+            List<Days> listDays = Arrays.asList(Days.values());
+            //get Days object if it exists
+            Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
+            if (!chosenDay.isEmpty()) {
+                Seance seance = null;
+                System.out.print("Enter title of a film: ");
+                String movieName = input.nextLine().strip();
+                //add seance
+                for (Movie m : moviesLibrary) {
+                    if (m.getTitle().equalsIgnoreCase(movieName)) {
+                        Time seanceTime = enterTime();
+                        seance = new Seance(m, seanceTime);
+                        if (open.compareTo(close) == -1) {
+                            //check if seance can fit into the schedule given that cinema works till midnight
+                            addSeanceTillMidnight(seance, seanceTime, chosenDay.get(),chosenHall);
+                        } else {
+                            //check if seance can fit into the schedule given that cinema works after midnight too
+                            addSeanceAfterMidnight(seance, seanceTime, chosenDay.get(),chosenHall);
+                        }
                     }
                 }
+                if (seance == null) {
+                    System.out.println("There is no movie running with the title \'" + movieName + "\'.");
+                }
+            } else {
+                System.out.println("Check the spelling!");
             }
-            if (seance == null) {
-                System.out.println("There is no movie running with the title \'" + movieName + "\'.");
-            }
-        } else {
-            System.out.println("Check the spelling!");
         }
     }
 
@@ -118,13 +126,15 @@ public class Cinema implements Serializable {
             System.out.println("Movie \'" + movieToDelete.get().getTitle() + "\' has been removed.");
             //remove movie from the library
             moviesLibrary.remove(movieToDelete.get());
-            for (Days d:Days.values()) {
+            for (Days d : Days.values()) {
                 //add all seances of the deleted movie to the list
-                List<Seance> seancesToDelete = schedules.get(d).getSeances().stream().filter(l->l.getMovie().equals(movieToDelete.get()))
-                        .collect(Collectors.toList());
-                //delete these seances from the schedules
-                for (Seance s : seancesToDelete) {
-                    schedules.get(d).getSeances().remove(s);
+                for (Hall hall : halls) {
+                    List<Seance> seancesToDelete = hall.getSchedules().get(d).getSeances().stream().filter(l -> l.getMovie().equals(movieToDelete.get()))
+                            .collect(Collectors.toList());
+                    //delete these seances from the schedules
+                    for (Seance s : seancesToDelete) {
+                        hall.getSchedules().get(d).getSeances().remove(s);
+                    }
                 }
             }
         }
@@ -147,21 +157,26 @@ public class Cinema implements Serializable {
     public void removeSeance() {
         Scanner input = new Scanner(System.in);
         System.out.println();
-        System.out.print("Enter the day you want to choose: ");
-        String day = input.nextLine().strip();
-        List<Days> listDays = Arrays.asList(Days.values());
-        Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
-        if (!chosenDay.isEmpty()) {
-            System.out.println("Enter the time of the seance you want to remove:");
-            Time seanceTime = enterTime();
-            Optional<Seance> seanceToRemove = schedules.get(chosenDay.get()).getSeances().stream().filter(d -> d.getStartTime().equals(seanceTime)).findFirst();
-            if (!seanceToRemove.isEmpty()) {
-                schedules.get(chosenDay.get()).getSeances().remove(seanceToRemove.get());
-                List<Seance> list = schedules.get(chosenDay.get()).getSeances().stream().sorted().collect(Collectors.toList());
-                if (list.isEmpty()) {
-                    System.out.println("There are no seances for today");
-                } else {
-                    list.stream().forEach(System.out::println);
+        Hall chosenHall = chooseHall();
+        if (chosenHall!=null) {
+            System.out.print("Enter the day you want to choose: ");
+            String day = input.nextLine().strip();
+            List<Days> listDays = Arrays.asList(Days.values());
+            Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
+            if (!chosenDay.isEmpty()) {
+                System.out.println("Enter the time of the seance you want to remove:");
+                Time seanceTime = enterTime();
+                Optional<Seance> seanceToRemove = chosenHall.getSchedules().get(chosenDay.get()).getSeances().stream()
+                        .filter(d -> d.getStartTime().equals(seanceTime)).findFirst();
+                if (!seanceToRemove.isEmpty()) {
+                    chosenHall.getSchedules().get(chosenDay.get()).getSeances().remove(seanceToRemove.get());
+                    List<Seance> list = chosenHall.getSchedules().get(chosenDay.get()).getSeances().stream()
+                            .sorted().collect(Collectors.toList());
+                    if (list.isEmpty()) {
+                        System.out.println("There are no seances for today");
+                    } else {
+                        list.stream().forEach(System.out::println);
+                    }
                 }
             }
         }
@@ -170,57 +185,63 @@ public class Cinema implements Serializable {
     public void printSeancesByDay() {
         Scanner input = new Scanner(System.in);
         System.out.println();
-        System.out.print("Enter the day you want to choose: ");
-        String day = input.nextLine().strip();
-        List<Days> listDays = Arrays.asList(Days.values());
-        Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
-        if (!chosenDay.isEmpty()) {
-            List<Seance> list = schedules.get(chosenDay.get()).getSeances().stream().sorted().collect(Collectors.toList());
-            if (list.isEmpty()) {
-                System.out.println("There are no seances for today yet!");
-            } else {
-                list.stream().forEach(System.out::println);
+        Hall chosenHall = chooseHall();
+        if (chosenHall!=null) {
+            System.out.print("Enter the day you want to choose: ");
+            String day = input.nextLine().strip();
+            List<Days> listDays = Arrays.asList(Days.values());
+            Optional<Days> chosenDay = listDays.stream().filter(d -> d.toString().equalsIgnoreCase(day)).findFirst();
+            if (!chosenDay.isEmpty()) {
+                List<Seance> list = chosenHall.getSchedules().get(chosenDay.get()).getSeances().stream().sorted().collect(Collectors.toList());
+                if (list.isEmpty()) {
+                    System.out.println("There are no seances for today yet!");
+                } else {
+                    list.stream().forEach(System.out::println);
+                }
             }
         }
     }
 
     public void displaySchedule() {
-        for (Days d : Days.values()) {
-            System.out.println(d);
-            if (!schedules.get(d).getSeances().isEmpty()) {
-                schedules.get(d).getSeances().forEach(System.out::println);
-            } else {
-                System.out.println("No seances this day.");
+        Hall chosenHall = chooseHall();
+        if (chosenHall!=null) {
+            for (Days d : Days.values()) {
+                System.out.println(d);
+                if (!chosenHall.getSchedules().get(d).getSeances().isEmpty()) {
+                    chosenHall.getSchedules().get(d).getSeances().forEach(System.out::println);
+                } else {
+                    System.out.println("No seances this day.");
+                }
+                System.out.println();
             }
-            System.out.println();
         }
     }
 
-    public void addSeanceTillMidnight(Seance seance, Time seanceTime, Days chosenDay){
+    public void addSeanceTillMidnight(Seance seance, Time seanceTime, Days chosenDay, Hall hall) {
         if (seanceTime.compareTo(open) == 1 && seance.getEndTime().compareTo(close) == -1
-                                            && seance.getEndTime().compareTo(open) == 1) {
-            addSeanceIfNoConflict(seance, chosenDay);
+                && seance.getEndTime().compareTo(open) == 1) {
+            addSeanceIfNoConflict(seance, chosenDay, hall);
         } else {
             System.out.println("The time you chose does not fit cinema's opening hours");
         }
     }
 
-    public void addSeanceAfterMidnight(Seance seance, Time seanceTime, Days chosenDay){
-        Time midnight = new Time(23,59);
+    public void addSeanceAfterMidnight(Seance seance, Time seanceTime, Days chosenDay, Hall hall) {
+        Time midnight = new Time(23, 59);
         if ((seanceTime.compareTo(open) == 1 && seance.getEndTime().compareTo(midnight) == -1)
                 || (seanceTime.compareTo(open) == 1 && seance.getEndTime().compareTo(close) == -1)
                 || (seanceTime.compareTo(close) == -1 && seance.getEndTime().compareTo(close) == -1)) {
-            addSeanceIfNoConflict(seance, chosenDay);
+            addSeanceIfNoConflict(seance, chosenDay, hall);
         } else {
             System.out.println("The time you chose does not fit cinema's opening hours");
         }
     }
 
-    public void addSeanceIfNoConflict(Seance seance,Days chosenDay){
-        if (schedules.get(chosenDay).checkIfNoConflict(seance)) {
-            schedules.get(chosenDay).getSeances().add(seance);
+    public void addSeanceIfNoConflict(Seance seance, Days chosenDay, Hall hall) {
+        if (hall.getSchedules().get(chosenDay).checkIfNoConflict(seance)) {
+            hall.getSchedules().get(chosenDay).getSeances().add(seance);
             System.out.println("Updated timeline for " + chosenDay);
-            schedules.get(chosenDay).getSeances().forEach(System.out::println);
+            hall.getSchedules().get(chosenDay).getSeances().forEach(System.out::println);
         } else {
             System.out.println("Sorry, there is another film running at that time!");
         }
@@ -240,17 +261,33 @@ public class Cinema implements Serializable {
         }
     }
 
-    public void fillTreeMap() {
-        for (Days d : Days.values()) {
-            schedules.put(d, new Schedule());
+    public Hall chooseHall() {
+        Scanner input = new Scanner(System.in);
+        System.out.print("List of the cinema's halls: ");
+        halls.stream().map(h -> h.getName()).forEach(l -> System.out.print("\'" + l + "\' "));
+        System.out.print(";");
+        System.out.println();
+        System.out.println("Enter the name of the hall: ");
+        String name = input.nextLine().strip();
+        Optional<Hall> hall = halls.stream().filter(h -> h.getName().equalsIgnoreCase(name))
+                .findFirst();
+        if (!hall.isEmpty()) {
+            return hall.get();
+        } else {
+            System.out.println("There is no hall with such a name");
+            return null;
         }
+    }
+
+    public TreeSet<Hall> getHalls() {
+        return halls;
     }
 
     @Override
     public String toString() {
         return "Cinema{" +
-                "schedules=" + schedules +
-                ", moviesLibrary=" + moviesLibrary +
+                "moviesLibrary=" + moviesLibrary +
+                ", halls=" + halls +
                 ", open=" + open +
                 ", close=" + close +
                 '}';

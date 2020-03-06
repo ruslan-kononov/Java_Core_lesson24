@@ -8,9 +8,11 @@ public class Main {
 
         Scanner input = new Scanner(System.in);
         Cinema cinema = new Cinema(new Time(8,0),new Time(23,59));
-        cinema.fillTreeMap();
+        cinema.getHalls().add(new Hall("Hall 1"));
         System.out.println("Cinema \"Space\" welcomes you!");
         System.out.println("Our working hours: "+cinema.getOpen()+" - "+cinema.getClose());
+        System.out.print("Cinema's halls: ");
+        cinema.getHalls().stream().map(h->h.getName()).forEach(h-> System.out.print(h+" "));
         boolean flag = false;
         while (!flag) {
             try {
@@ -29,7 +31,8 @@ public class Main {
                 System.out.println("Save changes to the file - 8");
                 System.out.println("Get object from the file - 9");
                 System.out.println("Display schedule for the week - 10");
-                System.out.println("Exit the system - 11");
+                System.out.println("Add new hall - 11");
+                System.out.println("Exit the system - 12");
                 System.out.println("=================================");
                 System.out.print("Enter your option: ");
                 int option = input.nextInt();
@@ -64,11 +67,16 @@ public class Main {
                         System.out.println();
                         System.out.println("Cinema \"Space\" welcomes you!");
                         System.out.println("Our working hours: "+cinema.getOpen()+" - "+cinema.getClose());
+                        System.out.print("Cinema's halls: ");
+                        cinema.getHalls().stream().map(h->h.getName()).forEach(h-> System.out.print(h+" "));
                         break;
                     case 10:
                         cinema.displaySchedule();
                         break;
                     case 11:
+                        cinema.addNewHall();
+                        break;
+                    case 12:
                         System.exit(0);
                         break;
                     default:
